@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nextcloud
+  labels:
+    app: nextcloud
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: nextcloud
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nextcloud-pvc
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "aws-efs"
+  labels:
+    app: nextcloud
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+
+kind: PersistentVolume
+
+metadata:
+  name: nextcloud-pv
+  labels:
+    app: nextcloud
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "aws-efs"
+
+
+spec:
+  storageClassName: "aws-efs"
+  capacity:
+    storage: 40Gi
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  nfs:
+    server: fs-a7dc5676.efs.ap-south-1.amazonaws.com
+    path: /
+---
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: nextcloud
+  labels:
+    app: nextcloud
+spec:
+  selector:
+    matchLabels:
+      app: nextcloud
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: nextcloud
+    spec:
+      containers:
+      - image: nextcloud
+        name: nextcloud
+        env:
+        - name: MYSQL_HOST
+          value: nextcloud-mysql-db
+        - name: MYSQL_DATABASE
+          value: mysqldb
+        - name: MYSQL_USER
+          value: ninad
+        - name: MYSQL_PASSWORD
+          value: sqlpass
+        ports:
+        - containerPort: 80
+          name: nextcloud
+        volumeMounts:
+        - name: nextcloud-persistent-storage
+          mountPath: /var/www/html
+      volumes:
+      - name: nextcloud-persistent-storage
+        persistentVolumeClaim:
+          claimName: nextcloud-pvc
