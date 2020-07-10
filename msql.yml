@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nextcloud-mysql-db
+  labels:
+    app: nextcloud
+spec:
+  ports:
+    - port: 3306
+  selector:
+    app: nextloud
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pv-claim
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "aws-efs"
+  labels:
+    app: nextloud
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv
+  labels:
+    app: nextcloud
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "aws-efs"
+
+spec:
+  storageClassName: "aws-efs"
+  capacity:
+    storage: 40Gi
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  nfs:
+    server: fs-a7dc5676.efs.ap-south-1.amazonaws.com
+    path: /
+---
+
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: nextcloud-mysql-db
+  labels:
+    app: nextcloud
+spec:
+  selector:
+    matchLabels:
+      app: nextcloud
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: nextcloud
+    spec:
+      containers:
+      - image: mysql:5.6
+        name: mysql
+        env:
+        - name: MYSQL_DATABASE
+          value: mysqldb
+        - name: MYSQL_ROOT_PASSWORD
+          value: sqlroot
+        - name: MYSQL_USER
+          value: ninad
+        - name: MYSQL_PASSWORD
+          value: sqlpass
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pv-claim
